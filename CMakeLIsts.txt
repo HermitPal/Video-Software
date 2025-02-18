@@ -1,0 +1,78 @@
+cmake_minimum_required(VERSION 3.15)
+project(luajit_example)
+
+# Add FetchContent
+include(FetchContent)
+
+# Fetch LuaJIT
+FetchContent_Declare(
+    luajit
+    GIT_REPOSITORY https://github.com/WohlSoft/LuaJIT.git
+    GIT_TAG v2.1
+)
+FetchContent_MakeAvailable(luajit)
+
+# Set C++ standard
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Create executable from main.cpp
+add_executable(${PROJECT_NAME} main.cpp)
+
+# Platform-specific settings
+if(WIN32)
+    # Disable specific warnings on Windows
+    add_compile_options(/wd4127 /wd4996)
+
+    # For Windows, link against the LuaJIT we just built
+    add_dependencies(${PROJECT_NAME} libluajit)
+    target_link_libraries(${PROJECT_NAME} PRIVATE libluajit)
+
+elseif(APPLE)
+    # Enable universal binary building
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
+
+    # Set minimum macOS version
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "10.11")
+
+    # Configure LuaJIT for universal build
+    set(CMAKE_OSX_ARCHITECTURES_LUAJIT "arm64;x86_64")
+
+    target_link_libraries(${PROJECT_NAME} PRIVATE luajit-5.1)
+
+else() # Linux
+    # For Linux, link against system LuaJIT
+    target_link_libraries(${PROJECT_NAME} PRIVATE luajit-5.1)
+endif()
+
+# Compiler-specific options
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        /W4 # Warning level 4
+        /wd4996 # Disable deprecation warnings
+        /wd4127 # Disable conditional expression is constant
+        /wd4324 # Disable structure padding warning
+    )
+else()
+    target_compile_options(${PROJECT_NAME} PRIVATE
+        -Wall
+    )
+endif()
+
+# Include directories
+target_include_directories(${PROJECT_NAME} PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/LuaJIT/src"
+)
+
+# Installation rules
+install(TARGETS ${PROJECT_NAME}
+    RUNTIME DESTINATION bin
+)
+
+# Custom command to copy the executable to the CMakeLists.txt directory
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        $<TARGET_FILE:${PROJECT_NAME}>
+        ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Copying executable to ${CMAKE_CURRENT_SOURCE_DIR}"
+)
