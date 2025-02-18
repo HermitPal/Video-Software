@@ -12,12 +12,23 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(luajit)
 
+# Fetch Raylib
+FetchContent_Declare(
+    raylib
+    GIT_REPOSITORY https://github.com/raysan5/raylib.git
+    GIT_TAG 5.5
+)
+FetchContent_MakeAvailable(raylib)
+
 # Set C++ standard
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Create executable from main.cpp
 add_executable(${PROJECT_NAME} main.cpp)
+
+# Link Raylib
+target_link_libraries(${PROJECT_NAME} PRIVATE raylib)
 
 # Platform-specific settings
 if(WIN32)
@@ -62,6 +73,11 @@ endif()
 # Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/LuaJIT/src"
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${raylib_SOURCE_DIR}/src
+    ${raylib_SOURCE_DIR}/src/external
 )
 
 # Installation rules
