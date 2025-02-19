@@ -6,7 +6,6 @@ static int l_DrawCircle(lua_State* L) {
     int y = luaL_checkinteger(L, 2);
     float radius = luaL_checknumber(L, 3);
     
-    // Get color table
     luaL_checktype(L, 4, LUA_TTABLE);
     lua_getfield(L, 4, "r");
     lua_getfield(L, 4, "g");
@@ -96,7 +95,6 @@ static int l_DrawLine(lua_State* L) {
 void registerRaylibBindings(lua_State* L) {
     lua_newtable(L);
     
-    // Register functions
     lua_pushcfunction(L, l_DrawCircle);
     lua_setfield(L, -2, "DrawCircle");
     
@@ -109,6 +107,5 @@ void registerRaylibBindings(lua_State* L) {
     lua_pushcfunction(L, l_DrawLine);
     lua_setfield(L, -2, "DrawLine");
     
-    // Set the table as global "raylib"
     lua_setglobal(L, "raylib");
 } 

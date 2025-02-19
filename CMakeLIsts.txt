@@ -25,7 +25,12 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Create executable from main.cpp
-add_executable(${PROJECT_NAME} main.cpp raylib_bindings.cpp)
+add_executable(${PROJECT_NAME} 
+    src/main.cpp
+    src/ffmpeg_pipe.cpp
+    src/animation.cpp
+    src/raylib_bindings.cpp
+)
 
 # Link Raylib
 target_link_libraries(${PROJECT_NAME} PRIVATE raylib)

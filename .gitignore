@@ -3,3 +3,4 @@ build
 .cache
 *.exe
 *.mp4
+docs
