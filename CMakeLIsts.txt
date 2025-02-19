@@ -32,9 +32,45 @@ add_executable(${PROJECT_NAME}
     src/raylib_bindings.cpp
 )
 
-# OpenMP configuration for MSVC
+# OpenMP configuration
 if(MSVC)
-    target_compile_options(${PROJECT_NAME} PRIVATE /openmp)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        # Clang-cl on Windows
+        target_compile_options(${PROJECT_NAME} PRIVATE -Xclang -fopenmp)
+        
+        # Link against LLVM OpenMP library
+        find_package(OpenMP REQUIRED)
+        target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
+        
+        # Add the OpenMP include path explicitly
+        if(OpenMP_CXX_INCLUDE_DIRS)
+            target_include_directories(${PROJECT_NAME} PRIVATE ${OpenMP_CXX_INCLUDE_DIRS})
+        endif()
+    else()
+        # Regular MSVC
+        target_compile_options(${PROJECT_NAME} PRIVATE /openmp)
+    endif()
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    # Find OpenMP package first
+    find_package(OpenMP REQUIRED)
+    
+    if(APPLE)
+        # macOS-specific OpenMP flags
+        target_compile_options(${PROJECT_NAME} PRIVATE -Xpreprocessor -fopenmp)
+        target_link_libraries(${PROJECT_NAME} PRIVATE OpenMP::OpenMP_CXX)
+    else()
+        # Linux Clang configuration
+        target_compile_options(${PROJECT_NAME} PRIVATE -fopenmp=libomp)
+        target_link_options(${PROJECT_NAME} PRIVATE -fopenmp=libomp)
+    endif()
+    
+    # Add the OpenMP include path explicitly
+    if(OpenMP_CXX_INCLUDE_DIRS)
+        target_include_directories(${PROJECT_NAME} PRIVATE ${OpenMP_CXX_INCLUDE_DIRS})
+    endif()
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+    target_compile_options(${PROJECT_NAME} PRIVATE -fopenmp)
+    target_link_options(${PROJECT_NAME} PRIVATE -fopenmp)
 endif()
 
 # Link Raylib
