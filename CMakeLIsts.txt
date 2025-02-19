@@ -32,6 +32,11 @@ add_executable(${PROJECT_NAME}
     src/raylib_bindings.cpp
 )
 
+# OpenMP configuration for MSVC
+if(MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /openmp)
+endif()
+
 # Link Raylib
 target_link_libraries(${PROJECT_NAME} PRIVATE raylib)
 

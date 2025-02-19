@@ -1,5 +1,6 @@
 #include "animation.h"
 #include <iostream>
+#include <omp.h>
 
 Animation::Animation(lua_State* L)
     : L_(L),
@@ -10,7 +11,7 @@ Animation::Animation(lua_State* L)
       target_(),
       rgbBuffer_(),
       frame_(0) {
-    std::cout << "Initializing Animation..." << std::endl;
+    std::cout << "Initializing Animation...." << std::endl;
     initializeRaylib();
     target_ = LoadRenderTexture(screenWidth_, screenHeight_);
     rgbBuffer_.resize(screenWidth_ * screenHeight_ * 3);
@@ -75,11 +76,15 @@ void Animation::renderFrame(float x, float y) {
 
 void Animation::processFrame() {
     Image image = LoadImageFromTexture(target_.texture);
-    ImageFlipVertical(&image);
+    Color* pixels = (Color*)image.data;
     
+    // Use parallel processing with OpenMP
+    #pragma omp parallel for collapse(2)
     for (int y = 0; y < screenHeight_; y++) {
         for (int x = 0; x < screenWidth_; x++) {
-            Color pixel = GetImageColor(image, x, y);
+            // Calculate flipped y coordinate (since we're removing ImageFlipVertical)
+            int flippedY = screenHeight_ - 1 - y;
+            const Color& pixel = pixels[flippedY * screenWidth_ + x];
             const size_t index = (y * screenWidth_ + x) * 3;
             rgbBuffer_[index] = pixel.r;
             rgbBuffer_[index + 1] = pixel.g;

@@ -4,7 +4,8 @@ FFmpegPipe::FFmpegPipe(int width, int height, int fps) {
     std::string ffmpegCommand = std::format(
         "ffmpeg -y -f rawvideo -pixel_format rgb24 "
         "-video_size {}x{} -framerate {} "
-        "-i - -c:v libx264 -preset medium -crf 23 "
+        "-i - -c:v libx264 -preset ultrafast -crf 23 "
+        "-threads 0 "
         "-pix_fmt yuv420p circle_animation.mp4",
         width, height, fps);
 
