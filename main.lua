@@ -1,16 +1,20 @@
--- Function to animate a circle from left to right
-function animate_circle(x_start, x_end, duration, fps)
-    local frames = duration * fps
-    for i = 0, frames do
-        BeginTextureMode(target)  -- Start drawing to texture
-        ClearBackground(BLACK)    -- Clear with black background
-        local x = x_start + (x_end - x_start) * (i / frames)
-        drawCircle(x, 540, 50)   -- Draw circle
-        EndTextureMode()         -- End drawing to texture
-        captureFrame()           -- Capture and send frame
-    end
-end
+-- Configuration for the animation
+screenWidth = 1920
+screenHeight = 1080
+fps = 30
+totalFrames = 60
 
--- Start the animation
-animate_circle(100, 1700, 30, 30)  -- 30 second animation
-print("Animation complete!")
+-- Circle customization
+circleRadius = 50
+circleColor = {
+    r = 255,  -- red component (0-255)
+    g = 0,    -- green component (0-255)
+    b = 255     -- blue component (0-255)
+}
+
+-- Background customization
+backgroundColor = {
+    r = 0,  -- red component (0-255)
+    g = 0,  -- green component (0-255)
+    b = 0   -- blue component (0-255)
+}
