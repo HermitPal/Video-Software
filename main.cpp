@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <format>
 #include <lua.hpp>  // Include LuaJIT header
+#include "raylib_bindings.h"  // Add this include
 
 #ifdef _WIN32
     #include <io.h>
@@ -18,49 +19,6 @@
     #include <unistd.h>
     #define EXPORT
 #endif
-
-// Function to load configuration from Lua
-void loadConfigFromLua(lua_State* L, int& width, int& height, int& fps, int& totalFrames, 
-                      float& radius, Color& circleColor, Color& backgroundColor) {
-    if (luaL_dofile(L, "main.lua") != LUA_OK) {
-        throw std::runtime_error(lua_tostring(L, -1));
-    }
-
-    lua_getglobal(L, "screenWidth");
-    width = luaL_checkinteger(L, -1);
-
-    lua_getglobal(L, "screenHeight");
-    height = luaL_checkinteger(L, -1);
-
-    lua_getglobal(L, "fps");
-    fps = luaL_checkinteger(L, -1);
-
-    lua_getglobal(L, "totalFrames");
-    totalFrames = luaL_checkinteger(L, -1);
-
-    lua_getglobal(L, "circleRadius");
-    radius = luaL_checknumber(L, -1);
-
-    // Load circle color
-    lua_getglobal(L, "circleColor");
-    lua_getfield(L, -1, "r");
-    circleColor.r = luaL_checkinteger(L, -1);
-    lua_getfield(L, -2, "g");
-    circleColor.g = luaL_checkinteger(L, -1);
-    lua_getfield(L, -3, "b");
-    circleColor.b = luaL_checkinteger(L, -1);
-    circleColor.a = 255;  // Set alpha to fully opaque
-
-    // Load background color
-    lua_getglobal(L, "backgroundColor");
-    lua_getfield(L, -1, "r");
-    backgroundColor.r = luaL_checkinteger(L, -1);
-    lua_getfield(L, -2, "g");
-    backgroundColor.g = luaL_checkinteger(L, -1);
-    lua_getfield(L, -3, "b");
-    backgroundColor.b = luaL_checkinteger(L, -1);
-    backgroundColor.a = 255;  // Set alpha to fully opaque
-}
 
 class FFmpegPipe {
 public:
@@ -109,14 +67,28 @@ struct AnimationConfig {
 
 class Animation {
 public:
-    Animation(int width, int height, int fps, int totalFrames, 
-             float radius, Color circleColor, Color backgroundColor)
-        : screenWidth_(width), screenHeight_(height), fps_(fps), 
-          totalFrames_(totalFrames), circleRadius_(radius),
-          circleColor_(circleColor), backgroundColor_(backgroundColor) {
+    Animation(lua_State* L)
+        : L_(L),
+          screenWidth_(1920),
+          screenHeight_(1080), 
+          fps_(30),
+          totalFrames_(60),
+          target_(),
+          rgbBuffer_(),
+          frame_(0) {
+        std::cout << "Initializing Animation..." << std::endl;
         initializeRaylib();
         target_ = LoadRenderTexture(screenWidth_, screenHeight_);
         rgbBuffer_.resize(screenWidth_ * screenHeight_ * 3);
+        
+        // Verify Lua state
+        lua_getglobal(L_, "raylib");
+        if (lua_istable(L_, -1)) {
+            std::cout << "Raylib table verified in Animation constructor" << std::endl;
+        } else {
+            std::cout << "Warning: Raylib table not found in Animation constructor" << std::endl;
+        }
+        lua_pop(L_, 1);
     }
 
     ~Animation() {
@@ -132,7 +104,7 @@ public:
         const float moveStep = (screenWidth_ - 200.0f) / 
                              static_cast<float>(totalFrames_);
 
-        for (int frame = 0; frame < totalFrames_; frame++) {
+        for (frame_ = 0; frame_ < totalFrames_; frame_++) {
             renderFrame(circleX, circleY);
             processFrame();
             ffmpeg.writeFrame(rgbBuffer_);
@@ -140,18 +112,34 @@ public:
         }
     }
 
-private:
-    void initializeRaylib() {
-        SetTraceLogLevel(LOG_NONE);
-        SetConfigFlags(FLAG_WINDOW_HIDDEN);
-        InitWindow(1, 1, "");
-    }
-
     void renderFrame(float x, float y) {
         BeginTextureMode(target_);
-            ClearBackground(backgroundColor_);  // Use custom background color
-            DrawCircle(static_cast<int>(x), static_cast<int>(y), 
-                      circleRadius_, circleColor_);  // Use custom circle color
+        ClearBackground(BLACK);  // Use BLACK as default background color, or any other color you prefer
+        
+        // Call Lua render function
+        lua_getglobal(L_, "onRender");
+        if (lua_isfunction(L_, -1)) {
+            lua_pushnumber(L_, x);
+            lua_pushnumber(L_, y);
+            lua_pushnumber(L_, frame_);
+            
+            if (lua_pcall(L_, 3, 0, 0) != LUA_OK) {
+                const char* error = lua_tostring(L_, -1);
+                std::cerr << "Lua error in renderFrame: " << error << std::endl;
+                
+                // Debug info
+                lua_getglobal(L_, "raylib");
+                if (lua_istable(L_, -1)) {
+                    std::cerr << "raylib table exists at error time" << std::endl;
+                } else {
+                    std::cerr << "raylib table missing at error time" << std::endl;
+                }
+                lua_pop(L_, 1);
+                
+                throw std::runtime_error(std::string("Lua error: ") + error);
+            }
+        }
+        
         EndTextureMode();
     }
 
@@ -172,48 +160,34 @@ private:
         UnloadImage(image);
     }
 
+private:
+    void initializeRaylib() {
+        SetTraceLogLevel(LOG_NONE);
+        SetConfigFlags(FLAG_WINDOW_HIDDEN);
+        InitWindow(1, 1, "");
+    }
+
+    lua_State* L_;
     int screenWidth_;
     int screenHeight_;
     int fps_;
     int totalFrames_;
     RenderTexture2D target_;
     std::vector<unsigned char> rgbBuffer_;
-    float circleRadius_;
-    Color circleColor_;
-    Color backgroundColor_;
+    int frame_;
 };
-
-extern "C" {
-    EXPORT void runAnimation() {
-        try {
-            lua_State* L = luaL_newstate();
-            luaL_openlibs(L);
-
-            int width, height, fps, totalFrames;
-            float radius;
-            Color circleColor, backgroundColor;
-            loadConfigFromLua(L, width, height, fps, totalFrames, radius, circleColor, backgroundColor);
-            Animation animation(width, height, fps, totalFrames, radius, circleColor, backgroundColor);
-            animation.run();
-
-            lua_close(L);
-        } catch (const std::exception& e) {
-            std::cerr << "Error: " << e.what() << std::endl;
-        }
-    }
-}
 
 int main() {
     lua_State* L = luaL_newstate();
     luaL_openlibs(L);
-
-    int width, height, fps, totalFrames;
-    float radius;
-    Color circleColor, backgroundColor;
+    registerRaylibBindings(L);
     
     try {
-        loadConfigFromLua(L, width, height, fps, totalFrames, radius, circleColor, backgroundColor);
-        Animation animation(width, height, fps, totalFrames, radius, circleColor, backgroundColor);
+        if (luaL_dofile(L, "main.lua") != LUA_OK) {
+            throw std::runtime_error(lua_tostring(L, -1));
+        }
+        
+        Animation animation(L);
         animation.run();
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;
